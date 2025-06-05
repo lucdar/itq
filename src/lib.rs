@@ -1,5 +1,7 @@
 pub mod app;
+#[cfg(feature = "ssr")]
 pub mod models;
+#[cfg(feature = "ssr")]
 pub mod schema;
 
 #[cfg(feature = "hydrate")]

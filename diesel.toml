@@ -6,4 +6,4 @@ file = "src/schema.rs"
 custom_type_derives = ["diesel::query_builder::QueryId", "Clone"]
 
 [migrations_directory]
-dir = "/home/lucdar/Projects/itq-leptos/migrations"
+dir = "/home/lucdar/Projects/itq/migrations"
