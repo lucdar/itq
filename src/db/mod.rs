@@ -1,3 +1,7 @@
+mod models;
+pub use models::*;
+pub mod schema;
+
 use diesel_async::{
     pooled_connection::{deadpool::Pool, AsyncDieselConnectionManager},
     AsyncPgConnection,

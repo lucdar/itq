@@ -5,7 +5,7 @@ use uuid::Uuid;
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::queues)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct DbQueue {
+pub struct Queue {
     pub id: Uuid,
     pub url_name: String,
     pub display_name: String,
@@ -15,7 +15,7 @@ pub struct DbQueue {
 #[derive(Queryable, Selectable)]
 #[diesel(table_name = crate::schema::queue_rows)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
-pub struct DbQueueRow {
+pub struct QueueRow {
     pub id: Uuid,
     pub queue_id: Uuid,
     pub left_player_name: Option<String>,
