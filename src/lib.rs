@@ -2,6 +2,7 @@ pub mod app;
 #[cfg(feature = "ssr")]
 pub mod db;
 pub mod pages;
+pub mod queue;
 
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]

@@ -1,9 +1,10 @@
-// use leptos::logging;
 use crate::pages::*;
 use leptos::prelude::*;
 use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
-use leptos_router::components::{Route, Router, Routes};
-use leptos_router::path;
+use leptos_router::{
+    components::{Route, Router, Routes},
+    path,
+};
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
     view! {
