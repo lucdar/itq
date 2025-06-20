@@ -7,12 +7,13 @@ pub struct QueueData {
     pub id: Uuid,
     pub url_name: String,
     pub display_name: String,
-    rows: VecDeque<RowData>,
+    pub rows: VecDeque<RowData>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RowData {
-    player_state: RowPlayerState,
+    pub id: Uuid,
+    pub player_state: RowPlayerState,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,5 +25,5 @@ pub enum RowPlayerState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PlayerData {
-    name: String,
+    pub name: String,
 }
