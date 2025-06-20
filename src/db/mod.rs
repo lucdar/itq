@@ -1,3 +1,4 @@
+pub mod api;
 mod models;
 pub use models::*;
 pub mod schema;
