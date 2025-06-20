@@ -18,7 +18,7 @@ wasm-bindgen = { version = "=0.2.100", optional = true }
 diesel = { version = "2.2.10", features = ["chrono", "uuid"], optional = true}
 diesel-async = {version = "0.5.2", features = ["postgres", "pool", "deadpool"], optional = true}
 dotenvy = "0.15.7"
-uuid = "1.17.0"
+uuid = { version = "1.17.0", features = ["serde"] }
 chrono = { version = "0.4.41", features = ["serde"] }
 thiserror = "2.0.12"
 serde_json = "1.0.140"

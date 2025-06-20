@@ -3,7 +3,7 @@ use diesel::prelude::*;
 use uuid::Uuid;
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::schema::queues)]
+#[diesel(table_name = crate::db::schema::queues)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Queue {
     pub id: Uuid,
@@ -13,7 +13,7 @@ pub struct Queue {
 }
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::schema::queue_rows)]
+#[diesel(table_name = crate::db::schema::queue_rows)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct QueueRow {
     pub id: Uuid,
