@@ -3,38 +3,49 @@ use crate::queue::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use leptos::logging::error;
-use leptos::prelude::*;
 use std::collections::VecDeque;
+use thiserror::Error;
 use uuid::Uuid;
 
-#[server]
-pub async fn queue_from_url_name(name: String) -> Result<QueueData, ServerFnError> {
+#[derive(Error, Debug)]
+pub enum ApiError {
+    #[error("Empty row with id {row_id} in queue {queue_id} at order {order}")]
+    EmptyRow {
+        row_id: Uuid,
+        queue_id: Uuid,
+        order: i32,
+    },
+    #[error("database connection pool error")]
+    PoolError(#[from] diesel_async::pooled_connection::deadpool::PoolError),
+    #[error("diesel error")]
+    DieselError(#[from] diesel::result::Error),
+}
+
+pub async fn get_queue(url_name: String, pool: db::DbPool) -> Result<QueueData, ApiError> {
     use crate::db::Queue;
-    use db::schema::queues::dsl::*;
-    // Select the db::Queue with the url_name = name.
-    let pool = use_context::<db::DbPool>().expect("there to be a `pool` provided.");
+    use db::schema::queues::dsl;
     let conn = &mut pool.get().await?;
     // Select the first queue with url_name matching `name`
-    let dbq: Queue = queues.filter(url_name.eq(name)).first(conn).await?;
+    let dbq: Queue = dsl::queues
+        .filter(dsl::url_name.eq(url_name))
+        .first(conn)
+        .await?;
     // My cat had this to say: =----r4eghf
     Ok(QueueData {
         id: dbq.id,
         url_name: dbq.url_name,
         display_name: dbq.display_name,
-        rows: get_queue_rows(dbq.id).await?,
+        rows: get_queue_rows(dbq.id, pool).await?,
     })
 }
 
-#[server]
-pub async fn get_queue_rows(q_id: Uuid) -> Result<VecDeque<RowData>, ServerFnError> {
-    // TODO: figure out how to work around this polluted namespace...
-    use db::schema::queue_rows::dsl::*;
-    let pool = use_context::<db::DbPool>().expect("there to be a `pool` provided.");
+async fn get_queue_rows(queue_id: Uuid, pool: db::DbPool) -> Result<VecDeque<RowData>, ApiError> {
+    use db::schema::queue_rows::dsl;
     let conn = &mut pool.get().await?;
 
-    let db_rows = queue_rows
-        .filter(queue_id.eq(q_id))
-        .order(queue_order.asc())
+    let db_rows = dsl::queue_rows
+        .filter(dsl::queue_id.eq(queue_id))
+        .order(dsl::queue_order.asc())
         .load::<db::QueueRow>(conn)
         .await?;
 
@@ -42,29 +53,27 @@ pub async fn get_queue_rows(q_id: Uuid) -> Result<VecDeque<RowData>, ServerFnErr
         .into_iter()
         // Throw out empty rows.
         // This shouldn't be possible anyway with the way the database is set up.
-        .filter_map(to_row_data)
+        .filter_map(|r| to_row_data(r).inspect_err(|e| error!("{e}")).ok())
         .collect();
     Ok(rows)
 }
 
-fn to_row_data(r: db::QueueRow) -> Option<RowData> {
-    let player_state = match (r.left_player_name, r.right_player_name) {
-        (Some(left), Some(right)) => Some(RowPlayerState::Both(
+fn to_row_data(row: db::QueueRow) -> Result<RowData, ApiError> {
+    let player_state = match (row.left_player_name, row.right_player_name) {
+        (Some(left), Some(right)) => Ok(RowPlayerState::Both(
             PlayerData { name: left },
             PlayerData { name: right },
         )),
-        (Some(left), None) => Some(RowPlayerState::LeftOnly(PlayerData { name: left })),
-        (None, Some(right)) => Some(RowPlayerState::RightOnly(PlayerData { name: right })),
-        (None, None) => {
-            error!(
-                "Empty queue row with id {} in queue {:?} at order {}",
-                r.id, r.queue_id, r.queue_order
-            );
-            None
-        }
+        (Some(left), None) => Ok(RowPlayerState::LeftOnly(PlayerData { name: left })),
+        (None, Some(right)) => Ok(RowPlayerState::RightOnly(PlayerData { name: right })),
+        (None, None) => Err(ApiError::EmptyRow {
+            row_id: row.id,
+            queue_id: row.queue_id,
+            order: row.queue_order,
+        }),
     }?;
-    Some(RowData {
-        id: r.id,
+    Ok(RowData {
+        id: row.id,
         player_state,
     })
 }

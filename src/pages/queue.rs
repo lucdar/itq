@@ -1,16 +1,6 @@
-#[cfg(feature = "ssr")]
-use crate::db;
-use crate::queue::{PlayerData, QueueData, RowData, RowPlayerState};
-#[cfg(feature = "ssr")]
-use diesel::prelude::*;
-#[cfg(feature = "ssr")]
-use diesel_async::RunQueryDsl;
-
-use leptos::logging::error;
+use crate::queue::QueueData;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
-use std::collections::VecDeque;
-use uuid::Uuid;
 
 #[component]
 pub fn QueuePage() -> impl IntoView {
@@ -18,7 +8,7 @@ pub fn QueuePage() -> impl IntoView {
     let url_queue_name = move || params.read().get("url_name");
     let queue_data: Resource<Option<QueueData>> = Resource::new(url_queue_name, |name| async {
         match name {
-            Some(name) => queue_from_url_name(name).await.ok(),
+            Some(name) => get_queue(name).await.ok(),
             None => None,
         }
     });
@@ -47,62 +37,13 @@ pub fn QueuePage() -> impl IntoView {
 }
 
 #[server]
-pub async fn queue_from_url_name(name: String) -> Result<QueueData, ServerFnError> {
-    use db::{schema::queues::dsl::*, Queue};
-    // Select the db::Queue with the url_name = name.
-    let pool = use_context::<db::DbPool>().expect("there to be a `pool` provided.");
-    let conn = &mut pool.get().await?;
-    // Select the first queue with url_name matching `name`
-    let dbq: Queue = queues.filter(url_name.eq(name)).first(conn).await?;
-    // My cat had this to say: =----r4eghf
-    Ok(QueueData {
-        id: dbq.id,
-        url_name: dbq.url_name,
-        display_name: dbq.display_name,
-        rows: get_queue_rows(dbq.id).await?,
-    })
-}
-
-#[server]
-pub async fn get_queue_rows(q_id: Uuid) -> Result<VecDeque<RowData>, ServerFnError> {
-    // TODO: figure out how to work around this polluted namespace...
-    use db::schema::queue_rows::dsl::*;
-    let pool = use_context::<db::DbPool>().expect("there to be a `pool` provided.");
-    let conn = &mut pool.get().await?;
-
-    fn to_row_data(r: db::QueueRow) -> Option<RowData> {
-        let player_state = match (r.left_player_name, r.right_player_name) {
-            (Some(left), Some(right)) => Some(RowPlayerState::Both(
-                PlayerData { name: left },
-                PlayerData { name: right },
-            )),
-            (Some(left), None) => Some(RowPlayerState::LeftOnly(PlayerData { name: left })),
-            (None, Some(right)) => Some(RowPlayerState::RightOnly(PlayerData { name: right })),
-            (None, None) => {
-                error!(
-                    "Empty queue row with id {} in queue {:?} at order {}",
-                    r.id, r.queue_id, r.queue_order
-                );
-                None
-            }
-        }?;
-        Some(RowData {
-            id: r.id,
-            player_state,
-        })
-    }
-
-    let db_rows = queue_rows
-        .filter(queue_id.eq(q_id))
-        .order(queue_order.asc())
-        .load::<db::QueueRow>(conn)
-        .await?;
-
-    let rows: VecDeque<RowData> = db_rows
-        .into_iter()
-        // Throw out empty rows.
-        // This shouldn't be possible anyway with the way the database is set up.
-        .filter_map(to_row_data)
-        .collect();
-    Ok(rows)
+/// Gets a queue from the database from the queue's unique url_name
+pub async fn get_queue(url_name: String) -> Result<QueueData, ServerFnError> {
+    // TODO: As it stands right now, I think this function makes two round-trips
+    // to the database (see [`crate::db::api::get_queue`]). It could be made
+    // more efficient by keeping track of the queue ID and getting rows as its
+    // own server function.
+    use crate::db::{api::get_queue, DbPool};
+    let pool = use_context::<DbPool>().expect("there to be a `pool` provided.");
+    Ok(get_queue(url_name, pool).await?)
 }
