@@ -1,6 +1,10 @@
+mod header;
+mod rows;
 use crate::queue::QueueData;
+use header::QueueHeader;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
+use rows::QueueRows;
 
 #[component]
 pub fn QueuePage() -> impl IntoView {
@@ -18,18 +22,14 @@ pub fn QueuePage() -> impl IntoView {
             <p>"Now Viewing: "{url_queue_name}</p>
             <Suspense fallback=move || view! {<p>"Loading queue..."</p>}>
                 {move || queue_data.get().flatten().map_or(
-                    view! {<p>Error! No Queue Found</p>}.into_any(),
-                    move |qd| view! {
-                        <h1>{qd.display_name}</h1>
-                        <p>"id "{qd.id.to_string()}</p>
-                        <For
-                            each={move || queue_data.get().unwrap().unwrap().rows}
-                            key={ |r| r.id }
-                            children={ move |r| view! {
-                                <p>{r.id.to_string()}</p>
-                            }}
-                        />
-                    }.into_any()
+                    view! {<h1>"Error: No Queue Found"</h1>}.into_any(),
+                    move |qd| {
+                        let (queue_data, _) = signal(qd);
+                        view! {
+                            <QueueHeader queue_data />
+                            <QueueRows queue_data />
+                        }.into_any()
+                    }
                 )}
             </Suspense>
         </div>
@@ -38,7 +38,7 @@ pub fn QueuePage() -> impl IntoView {
 
 #[server]
 /// Gets a queue from the database from the queue's unique url_name
-pub async fn get_queue(url_name: String) -> Result<QueueData, ServerFnError> {
+async fn get_queue(url_name: String) -> Result<QueueData, ServerFnError> {
     // TODO: As it stands right now, I think this function makes two round-trips
     // to the database (see [`crate::db::api::get_queue`]). It could be made
     // more efficient by keeping track of the queue ID and getting rows as its
