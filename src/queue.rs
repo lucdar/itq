@@ -1,29 +1,25 @@
 use leptos::server_fn::serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct QueueData {
+pub struct QueueInfo {
     pub id: Uuid,
     pub url_name: String,
     pub display_name: String,
-    pub rows: VecDeque<RowData>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RowData {
+pub struct QueueEntry {
     pub id: Uuid,
-    pub player_state: RowPlayerState,
+    pub queue_id: Uuid,
+    pub order: i32,
+    pub players: EntryPlayers,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum RowPlayerState {
-    LeftOnly(PlayerData),
-    RightOnly(PlayerData),
-    Both(PlayerData, PlayerData),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PlayerData {
-    pub name: String,
+// TODO: Update this when players are added to database.
+pub enum EntryPlayers {
+    LeftOnly(String),
+    RightOnly(String),
+    Both(String, String),
 }

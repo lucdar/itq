@@ -3,7 +3,6 @@ use crate::queue::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
 use leptos::logging::error;
-use std::collections::VecDeque;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -21,7 +20,20 @@ pub enum ApiError {
     DieselError(#[from] diesel::result::Error),
 }
 
-pub async fn get_queue(url_name: String, pool: db::DbPool) -> Result<QueueData, ApiError> {
+// TODO: finish this after data structure refactoring.
+// pub async fn get_all_queues(pool: db::DbPool) -> Result<Vec<QueueInfo>, ApiError> {
+//     use crate::db::Queue;
+//     use db::schema::queues::dsl;
+
+//     let conn = &mut pool.get().await?;
+//     let queues: Vec<Queue> = dsl::queues.get_results(conn).await?;
+
+//     Ok(queues
+//         .into_iter()
+//         .map(|queue| ))
+// }
+
+pub async fn get_queue_info(url_name: String, pool: db::DbPool) -> Result<QueueInfo, ApiError> {
     use crate::db::Queue;
     use db::schema::queues::dsl;
     let conn = &mut pool.get().await?;
@@ -31,15 +43,17 @@ pub async fn get_queue(url_name: String, pool: db::DbPool) -> Result<QueueData, 
         .first(conn)
         .await?;
     // My cat had this to say: =----r4eghf
-    Ok(QueueData {
+    Ok(QueueInfo {
         id: dbq.id,
         url_name: dbq.url_name,
         display_name: dbq.display_name,
-        rows: get_queue_rows(dbq.id, pool).await?,
     })
 }
 
-async fn get_queue_rows(queue_id: Uuid, pool: db::DbPool) -> Result<VecDeque<RowData>, ApiError> {
+pub async fn get_queue_entries(
+    queue_id: Uuid,
+    pool: db::DbPool,
+) -> Result<Vec<QueueEntry>, ApiError> {
     use db::schema::queue_rows::dsl;
     let conn = &mut pool.get().await?;
 
@@ -49,7 +63,7 @@ async fn get_queue_rows(queue_id: Uuid, pool: db::DbPool) -> Result<VecDeque<Row
         .load::<db::QueueRow>(conn)
         .await?;
 
-    let rows: VecDeque<RowData> = db_rows
+    let rows: Vec<QueueEntry> = db_rows
         .into_iter()
         // Throw out empty rows.
         // This shouldn't be possible anyway with the way the database is set up.
@@ -58,22 +72,21 @@ async fn get_queue_rows(queue_id: Uuid, pool: db::DbPool) -> Result<VecDeque<Row
     Ok(rows)
 }
 
-fn to_row_data(row: db::QueueRow) -> Result<RowData, ApiError> {
-    let player_state = match (row.left_player_name, row.right_player_name) {
-        (Some(left), Some(right)) => Ok(RowPlayerState::Both(
-            PlayerData { name: left },
-            PlayerData { name: right },
-        )),
-        (Some(left), None) => Ok(RowPlayerState::LeftOnly(PlayerData { name: left })),
-        (None, Some(right)) => Ok(RowPlayerState::RightOnly(PlayerData { name: right })),
+fn to_row_data(entry: db::QueueRow) -> Result<QueueEntry, ApiError> {
+    let player_state = match (entry.left_player_name, entry.right_player_name) {
+        (Some(left), Some(right)) => Ok(EntryPlayers::Both(left, right)),
+        (Some(left), None) => Ok(EntryPlayers::LeftOnly(left)),
+        (None, Some(right)) => Ok(EntryPlayers::RightOnly(right)),
         (None, None) => Err(ApiError::EmptyRow {
-            row_id: row.id,
-            queue_id: row.queue_id,
-            order: row.queue_order,
+            row_id: entry.id,
+            queue_id: entry.queue_id,
+            order: entry.queue_order,
         }),
     }?;
-    Ok(RowData {
-        id: row.id,
-        player_state,
+    Ok(QueueEntry {
+        id: entry.id,
+        queue_id: entry.queue_id,
+        order: entry.queue_order,
+        players: player_state,
     })
 }
