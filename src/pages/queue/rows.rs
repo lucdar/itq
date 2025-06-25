@@ -14,7 +14,7 @@ pub fn QueueRows(queue_data: ReadSignal<QueueInfo>) -> impl IntoView {
                         <For
                             each={ move || { v.clone().into_iter().enumerate() } }
                             key={ |(_, row)| row.id }
-                            children={ move |(idx, entry)| view!{ <Row entry=entry idx/> } }
+                            children={ move |(idx, entry)| view!{ <Row entry idx/> } }
                         />
                     }.into_any(),
                     Err(e) => view! {

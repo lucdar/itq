@@ -20,18 +20,22 @@ pub enum ApiError {
     DieselError(#[from] diesel::result::Error),
 }
 
-// TODO: finish this after data structure refactoring.
-// pub async fn get_all_queues(pool: db::DbPool) -> Result<Vec<QueueInfo>, ApiError> {
-//     use crate::db::Queue;
-//     use db::schema::queues::dsl;
+pub async fn get_all_queues(pool: db::DbPool) -> Result<Vec<QueueInfo>, ApiError> {
+    use crate::db::Queue;
+    use db::schema::queues::dsl;
 
-//     let conn = &mut pool.get().await?;
-//     let queues: Vec<Queue> = dsl::queues.get_results(conn).await?;
+    let conn = &mut pool.get().await?;
+    let queues: Vec<Queue> = dsl::queues.get_results(conn).await?;
 
-//     Ok(queues
-//         .into_iter()
-//         .map(|queue| ))
-// }
+    Ok(queues
+        .into_iter()
+        .map(|queue| QueueInfo {
+            id: queue.id,
+            url_name: queue.url_name,
+            display_name: queue.display_name,
+        })
+        .collect())
+}
 
 pub async fn get_queue_info(url_name: String, pool: db::DbPool) -> Result<QueueInfo, ApiError> {
     use crate::db::Queue;
