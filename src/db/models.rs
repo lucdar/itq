@@ -1,9 +1,10 @@
+use crate::db::schema::{queue_rows, queues};
 use chrono::Utc;
 use diesel::prelude::*;
 use uuid::Uuid;
 
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::db::schema::queues)]
+#[diesel(table_name = queues)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct Queue {
     pub id: Uuid,
@@ -12,8 +13,15 @@ pub struct Queue {
     pub created_at: chrono::DateTime<Utc>,
 }
 
+#[derive(Insertable)]
+#[diesel(table_name = queues)]
+pub struct NewQueue {
+    pub url_name: String,
+    pub display_name: String,
+}
+
 #[derive(Queryable, Selectable)]
-#[diesel(table_name = crate::db::schema::queue_rows)]
+#[diesel(table_name = queue_rows)]
 #[diesel(check_for_backend(diesel::pg::Pg))]
 pub struct QueueRow {
     pub id: Uuid,

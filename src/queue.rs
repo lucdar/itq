@@ -23,3 +23,53 @@ pub enum EntryPlayers {
     RightOnly(String),
     Both(String, String),
 }
+
+#[cfg(feature = "ssr")]
+use crate::db;
+#[cfg(feature = "ssr")]
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum ConversionError {
+    #[error("Empty row with id {row_id} in queue {queue_id} at order {order}")]
+    EmptyRow {
+        row_id: Uuid,
+        queue_id: Uuid,
+        order: i32,
+    },
+}
+
+#[cfg(feature = "ssr")]
+impl From<db::Queue> for QueueInfo {
+    fn from(queue: db::Queue) -> Self {
+        QueueInfo {
+            id: queue.id,
+            url_name: queue.url_name,
+            display_name: queue.display_name,
+        }
+    }
+}
+
+#[cfg(feature = "ssr")]
+impl TryFrom<db::QueueRow> for QueueEntry {
+    type Error = ConversionError;
+
+    fn try_from(db_row: db::QueueRow) -> Result<Self, ConversionError> {
+        let player_state = match (db_row.left_player_name, db_row.right_player_name) {
+            (Some(left), Some(right)) => Ok(EntryPlayers::Both(left, right)),
+            (Some(left), None) => Ok(EntryPlayers::LeftOnly(left)),
+            (None, Some(right)) => Ok(EntryPlayers::RightOnly(right)),
+            (None, None) => Err(ConversionError::EmptyRow {
+                row_id: db_row.id,
+                queue_id: db_row.queue_id,
+                order: db_row.queue_order,
+            }),
+        }?;
+        Ok(QueueEntry {
+            id: db_row.id,
+            queue_id: db_row.queue_id,
+            order: db_row.queue_order,
+            players: player_state,
+        })
+    }
+}
