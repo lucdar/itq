@@ -29,6 +29,7 @@ use crate::db;
 #[cfg(feature = "ssr")]
 use thiserror::Error;
 
+#[cfg(feature = "ssr")]
 #[derive(Debug, Error)]
 pub enum ConversionError {
     #[error("Empty row with id {row_id} in queue {queue_id} at order {order}")]
