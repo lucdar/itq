@@ -1,6 +1,5 @@
 use crate::queue::QueueInfo;
 use leptos::prelude::*;
-use leptos_router::path;
 
 #[component]
 pub fn AddQueuePage() -> impl IntoView {
