@@ -1,6 +1,9 @@
+mod delete_button;
 mod header;
 mod rows;
+
 use crate::queue::QueueInfo;
+use delete_button::DeleteButton;
 use header::QueueHeader;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
@@ -28,6 +31,7 @@ pub fn QueuePage() -> impl IntoView {
                         view! {
                             <QueueHeader queue_data />
                             <QueueRows queue_data />
+                            <DeleteButton queue_data />
                         }.into_any()
                     }
                 )}

@@ -78,3 +78,13 @@ pub async fn add_queue(
         .await?;
     Ok(queue.into())
 }
+
+pub async fn delete_queue(queue_id: Uuid, pool: db::DbPool) -> Result<(), ApiError> {
+    use db::schema::queues::dsl;
+    let conn = &mut pool.get().await?;
+    diesel::delete(dsl::queues.filter(dsl::id.eq(queue_id)))
+        .execute(conn)
+        .await
+        .inspect_err(|e| error!("{e}"))?;
+    Ok(())
+}

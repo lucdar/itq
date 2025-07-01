@@ -1,6 +1,6 @@
 CREATE TABLE queue_rows (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    queue_id UUID NOT NULL REFERENCES queues(id),
+    queue_id UUID NOT NULL REFERENCES queues(id) ON DELETE CASCADE,
 
     -- TEXT is placeholder, will eventually be more expressive
     left_player_name TEXT,

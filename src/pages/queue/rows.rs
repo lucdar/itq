@@ -34,10 +34,6 @@ pub fn Row(entry: QueueEntry, idx: usize) -> impl IntoView {
         EntryPlayers::Both(left, right) => (Some(left), Some(right)),
     };
 
-    // Idk if this even really makes sense?
-    let (left, _) = signal(left);
-    let (right, _) = signal(right);
-
     view! {
         <div class="rowContainer">
             <div class="orderLabel">{idx}</div>
@@ -51,8 +47,8 @@ pub fn Row(entry: QueueEntry, idx: usize) -> impl IntoView {
 // Or have different methods like token_view() or info_view() etc.
 // Might not really make sense unless it's used in many places.
 #[component]
-pub fn PlayerToken(player_data: ReadSignal<Option<String>>) -> impl IntoView {
-    match player_data.get() {
+pub fn PlayerToken(player_data: Option<String>) -> impl IntoView {
+    match player_data {
         None => view! {
             <div class="player-token empty">
                 <p>"Empty"</p>
