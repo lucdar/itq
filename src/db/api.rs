@@ -58,3 +58,23 @@ pub async fn get_queue_entries(
         .collect();
     Ok(rows)
 }
+
+pub async fn add_queue(
+    display_name: String,
+    url_name: String,
+    pool: db::DbPool,
+) -> Result<QueueInfo, ApiError> {
+    use crate::db::{NewQueue, Queue};
+    use db::schema::queues;
+    let conn = &mut pool.get().await?;
+
+    let new_queue = NewQueue {
+        display_name,
+        url_name,
+    };
+    let queue: Queue = diesel::insert_into(queues::table)
+        .values(&new_queue)
+        .get_result(conn)
+        .await?;
+    Ok(queue.into())
+}

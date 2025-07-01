@@ -43,6 +43,7 @@ pub fn App() -> impl IntoView {
                 <Routes fallback=|| "Page not found.".into_view()>
                     <Route path=path!("") view=HomePage/>
                     <Route path=path!("/queue/:url_name") view=QueuePage/>
+                    <Route path=path!("/add") view=AddQueuePage/>
                 </Routes>
             </main>
         </Router>
