@@ -1,11 +1,8 @@
-use core::fmt;
-
 use crate::db;
 use crate::db::QueueRow;
 use crate::queue::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use leptos::html::I;
 use leptos::logging::error;
 use thiserror::Error;
 use uuid::Uuid;
