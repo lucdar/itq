@@ -1,4 +1,5 @@
 use leptos::server_fn::serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -22,6 +23,21 @@ pub enum EntryPlayers {
     LeftOnly(String),
     RightOnly(String),
     Both(String, String),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Side {
+    Left,
+    Right,
+}
+
+impl Display for Side {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Side::Left => write!(f, "left"),
+            Side::Right => write!(f, "right"),
+        }
+    }
 }
 
 #[cfg(feature = "ssr")]

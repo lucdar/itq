@@ -1,4 +1,6 @@
-use crate::queue::{EntryPlayers, QueueEntry, QueueInfo};
+mod add_player_modal;
+
+use crate::queue::{EntryPlayers, QueueEntry, QueueInfo, Side};
 use leptos::prelude::*;
 use uuid::Uuid;
 
@@ -22,6 +24,7 @@ pub fn QueueRows(queue_data: ReadSignal<QueueInfo>) -> impl IntoView {
                     }.into_any()
                 }
             })}
+            <EmptyRow />
         </Suspense>
     }
 }
@@ -43,15 +46,32 @@ pub fn Row(entry: QueueEntry, idx: usize) -> impl IntoView {
     }
 }
 
+#[component]
+pub fn EmptyRow() -> impl IntoView {
+    view! {
+        <div class="rowContainer">
+            <div class="orderLabel">"-"</div>
+            <PlayerToken player_data=None />
+            <PlayerToken player_data=None />
+        </div>
+    }
+}
+
 // TODO: When players are their own "type", we could implement IntoView on the Player struct?
 // Or have different methods like token_view() or info_view() etc.
 // Might not really make sense unless it's used in many places.
 #[component]
 pub fn PlayerToken(player_data: Option<String>) -> impl IntoView {
+    let (show_modal, write_show_modal) = signal(false);
+
     match player_data {
         None => view! {
             <div class="player-token empty">
-                <p>"Empty"</p>
+                <button on:click={move |_| write_show_modal.set(true)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                </button>
             </div>
         }
         .into_any(),
@@ -69,4 +89,16 @@ pub async fn get_queue_entries(queue_id: Uuid) -> Result<Vec<QueueEntry>, Server
     use crate::db::{api::get_queue_entries, DbPool};
     let pool = use_context::<DbPool>().expect("there to be a `pool` provided.");
     Ok(get_queue_entries(queue_id, pool).await?)
+}
+
+#[server]
+pub async fn add_player(
+    queue_id: Uuid,
+    player: String,
+    order: usize,
+    side: Side,
+) -> Result<(), ServerFnError> {
+    use crate::db::{api::add_player, DbPool};
+    let pool = use_context::<DbPool>().expect("there to be a `pool` provided.");
+    Ok(add_player(queue_id, player, order as i32, side, pool).await?)
 }
