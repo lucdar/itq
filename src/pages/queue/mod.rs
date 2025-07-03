@@ -5,6 +5,7 @@ mod rows;
 use crate::queue::QueueInfo;
 use delete_button::DeleteButton;
 use header::QueueHeader;
+use leptos::context::provide_context;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 use rows::QueueRows;
@@ -13,7 +14,7 @@ use rows::QueueRows;
 pub fn QueuePage() -> impl IntoView {
     let params = use_params_map();
     let url_queue_name = move || params.read().get("url_name");
-    let queue_data = Resource::new(url_queue_name, |name| async {
+    let queue_info = Resource::new(url_queue_name, |name| async {
         match name {
             Some(name) => get_queue(name).await.ok(),
             None => None,
@@ -24,14 +25,14 @@ pub fn QueuePage() -> impl IntoView {
         <div class="queue-page">
             <p>"Now Viewing: "{url_queue_name}</p>
             <Suspense fallback=move || view! {<p>"Loading queue..."</p>}>
-                {move || queue_data.get().flatten().map_or(
+                {move || queue_info.get().flatten().map_or(
                     view! {<h1>"Error: No Queue Found"</h1>}.into_any(),
-                    move |qd| {
-                        let (queue_data, _) = signal(qd);
+                    move |queue_info| {
+                        provide_context(queue_info);
                         view! {
-                            <QueueHeader queue_data />
-                            <QueueRows queue_data />
-                            <DeleteButton queue_data />
+                            <QueueHeader />
+                            <QueueRows />
+                            <DeleteButton />
                         }.into_any()
                     }
                 )}

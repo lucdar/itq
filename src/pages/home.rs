@@ -24,6 +24,7 @@ pub fn HomePage() -> impl IntoView {
                 }
             })}
         </Suspense>
+        <a href="/add">"add :3"</a>
     }
 }
 

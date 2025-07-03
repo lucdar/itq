@@ -25,7 +25,7 @@ pub enum EntryPlayers {
     Both(String, String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
 pub enum Side {
     Left,
     Right,
@@ -34,8 +34,8 @@ pub enum Side {
 impl Display for Side {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Side::Left => write!(f, "left"),
-            Side::Right => write!(f, "right"),
+            Side::Left => write!(f, "Left"),
+            Side::Right => write!(f, "Right"),
         }
     }
 }
