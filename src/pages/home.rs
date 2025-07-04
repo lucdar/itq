@@ -8,21 +8,31 @@ pub fn HomePage() -> impl IntoView {
 
     view! {
         <h1>Welcome to itq!</h1>
-        <Suspense fallback= move || view!{<p>Loading queues...</p>}>
-            { move || queue_infos.get().map(|info| {
-                match info {
-                    Ok(q) => view! {
-                        <For
-                          each={move || q.clone().into_iter()}
-                          key={|q| q.id}
-                          children={move |q| view!{<QueueDisplay queue_info=q />}}
-                        />
-                    }.into_any(),
-                    Err(e) => view! {
-                        <p>"Error Loading Queues: "{e.to_string()}</p>
-                    }.into_any()
-                }
-            })}
+        <Suspense fallback=move || {
+            view! { <p>Loading queues...</p> }
+        }>
+            {move || {
+                queue_infos
+                    .get()
+                    .map(|info| {
+                        match info {
+                            Ok(q) => {
+                                view! {
+                                    <For
+                                        each=move || q.clone().into_iter()
+                                        key=|q| q.id
+                                        children=move |q| view! { <QueueDisplay queue_info=q /> }
+                                    />
+                                }
+                                    .into_any()
+                            }
+                            Err(e) => {
+                                view! { <p>"Error Loading Queues: "{e.to_string()}</p> }
+                                    .into_any()
+                            }
+                        }
+                    })
+            }}
         </Suspense>
         <a href="/add">"add :3"</a>
     }
@@ -34,7 +44,7 @@ pub fn QueueDisplay(queue_info: QueueInfo) -> impl IntoView {
 
     view! {
         <div class="homepage-info">
-            <a href={href}>{queue_info.display_name}</a>
+            <a href=href>{queue_info.display_name}</a>
         </div>
     }
 }

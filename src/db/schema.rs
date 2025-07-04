@@ -24,7 +24,4 @@ diesel::table! {
 
 diesel::joinable!(queue_rows -> queues (queue_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    queue_rows,
-    queues,
-);
+diesel::allow_tables_to_appear_in_same_query!(queue_rows, queues,);

@@ -16,7 +16,8 @@ async fn main() {
     dotenvy::dotenv().expect(".env should be loadable");
 
     // Create database pool
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url =
+        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let pool = db::create_pool(&database_url).await;
 
     // Generate the list of routes in your Leptos App
@@ -41,7 +42,9 @@ async fn main() {
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
     log!("listening on http://{}", &addr);
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .unwrap();
     axum::serve(listener, app.into_make_service())
         .await
         .unwrap();

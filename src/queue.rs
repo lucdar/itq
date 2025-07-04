@@ -72,16 +72,19 @@ impl TryFrom<db::QueueRow> for QueueEntry {
     type Error = ConversionError;
 
     fn try_from(db_row: db::QueueRow) -> Result<Self, ConversionError> {
-        let player_state = match (db_row.left_player_name, db_row.right_player_name) {
-            (Some(left), Some(right)) => Ok(EntryPlayers::Both(left, right)),
-            (Some(left), None) => Ok(EntryPlayers::LeftOnly(left)),
-            (None, Some(right)) => Ok(EntryPlayers::RightOnly(right)),
-            (None, None) => Err(ConversionError::EmptyRow {
-                row_id: db_row.id,
-                queue_id: db_row.queue_id,
-                order: db_row.queue_order,
-            }),
-        }?;
+        let player_state =
+            match (db_row.left_player_name, db_row.right_player_name) {
+                (Some(left), Some(right)) => {
+                    Ok(EntryPlayers::Both(left, right))
+                }
+                (Some(left), None) => Ok(EntryPlayers::LeftOnly(left)),
+                (None, Some(right)) => Ok(EntryPlayers::RightOnly(right)),
+                (None, None) => Err(ConversionError::EmptyRow {
+                    row_id: db_row.id,
+                    queue_id: db_row.queue_id,
+                    order: db_row.queue_order,
+                }),
+            }?;
         Ok(QueueEntry {
             id: db_row.id,
             queue_id: db_row.queue_id,

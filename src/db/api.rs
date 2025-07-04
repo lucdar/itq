@@ -23,17 +23,27 @@ pub enum ApiError {
     InvalidOrder { expected: i32, got: i32 },
 }
 
-pub async fn get_all_queues(pool: db::DbPool) -> Result<Vec<QueueInfo>, ApiError> {
+pub async fn get_all_queues(
+    pool: db::DbPool,
+) -> Result<Vec<QueueInfo>, ApiError> {
     use crate::db::Queue;
     use db::schema::queues::dsl;
 
     let conn = &mut pool.get().await?;
-    let queues: Vec<Queue> = dsl::queues.get_results(conn).await?;
+    let queues: Vec<Queue> = dsl::queues
+        .get_results(conn)
+        .await?;
 
-    Ok(queues.into_iter().map(QueueInfo::from).collect())
+    Ok(queues
+        .into_iter()
+        .map(QueueInfo::from)
+        .collect())
 }
 
-pub async fn get_queue_info(url_name: String, pool: db::DbPool) -> Result<QueueInfo, ApiError> {
+pub async fn get_queue_info(
+    url_name: String,
+    pool: db::DbPool,
+) -> Result<QueueInfo, ApiError> {
     use crate::db::Queue;
     use db::schema::queues::dsl;
     let conn = &mut pool.get().await?;
@@ -63,7 +73,11 @@ pub async fn get_queue_entries(
         .into_iter()
         // Throw out empty rows.
         // This should already be enforced by the database.
-        .filter_map(|r| r.try_into().inspect_err(|e| error!("{e}")).ok())
+        .filter_map(|r| {
+            r.try_into()
+                .inspect_err(|e| error!("{e}"))
+                .ok()
+        })
         .collect();
     Ok(rows)
 }
@@ -88,7 +102,10 @@ pub async fn add_queue(
     Ok(queue.into())
 }
 
-pub async fn delete_queue(queue_id: Uuid, pool: db::DbPool) -> Result<(), ApiError> {
+pub async fn delete_queue(
+    queue_id: Uuid,
+    pool: db::DbPool,
+) -> Result<(), ApiError> {
     use db::schema::queues::dsl;
     let conn = &mut pool.get().await?;
     diesel::delete(dsl::queues.filter(dsl::id.eq(queue_id)))

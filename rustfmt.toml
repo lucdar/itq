@@ -1,0 +1,12 @@
+edition = "2021"
+max_width = 80
+fn_call_width = 50
+array_width = 50
+chain_width = 35
+newline_style = "Unix"
+tab_spaces = 4
+
+comment_width = 80
+doc_comment_code_block_width = 80
+hex_literal_case = "Lower"
+wrap_comments = true

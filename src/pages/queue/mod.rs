@@ -24,18 +24,26 @@ pub fn QueuePage() -> impl IntoView {
     view! {
         <div class="queue-page">
             <p>"Now Viewing: "{url_queue_name}</p>
-            <Suspense fallback=move || view! {<p>"Loading queue..."</p>}>
-                {move || queue_info.get().flatten().map_or(
-                    view! {<h1>"Error: No Queue Found"</h1>}.into_any(),
-                    move |queue_info| {
-                        provide_context(queue_info);
-                        view! {
-                            <QueueHeader />
-                            <QueueRows />
-                            <DeleteButton />
-                        }.into_any()
-                    }
-                )}
+            <Suspense fallback=move || {
+                view! { <p>"Loading queue..."</p> }
+            }>
+                {move || {
+                    queue_info
+                        .get()
+                        .flatten()
+                        .map_or(
+                            view! { <h1>"Error: No Queue Found"</h1> }.into_any(),
+                            move |queue_info| {
+                                provide_context(queue_info);
+                                view! {
+                                    <QueueHeader />
+                                    <QueueRows />
+                                    <DeleteButton />
+                                }
+                                    .into_any()
+                            },
+                        )
+                }}
             </Suspense>
         </div>
     }

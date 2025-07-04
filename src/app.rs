@@ -11,14 +11,17 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
         <!DOCTYPE html>
         <html lang="en">
             <head>
-                <meta charset="utf-8"/>
-                <meta name="viewport" content="width=device-width, initial-scale=1"/>
+                <meta charset="utf-8" />
+                <meta
+                    name="viewport"
+                    content="width=device-width, initial-scale=1"
+                />
                 <AutoReload options=options.clone() />
-                <HydrationScripts options/>
-                <MetaTags/>
+                <HydrationScripts options />
+                <MetaTags />
             </head>
             <body>
-                <App/>
+                <App />
             </body>
         </html>
     }
@@ -32,18 +35,18 @@ pub fn App() -> impl IntoView {
     view! {
         // injects a stylesheet into the document <head>
         // id=leptos means cargo-leptos will hot-reload this stylesheet
-        <Stylesheet id="leptos" href="/pkg/itq.css"/>
+        <Stylesheet id="leptos" href="/pkg/itq.css" />
 
         // sets the document title
-        <Title text="Welcome to Leptos"/>
+        <Title text="Welcome to Leptos" />
 
         // content for this welcome page
         <Router>
             <main>
                 <Routes fallback=|| "Page not found.".into_view()>
-                    <Route path=path!("") view=HomePage/>
-                    <Route path=path!("/queue/:url_name") view=QueuePage/>
-                    <Route path=path!("/add") view=AddQueuePage/>
+                    <Route path=path!("") view=HomePage />
+                    <Route path=path!("/queue/:url_name") view=QueuePage />
+                    <Route path=path!("/add") view=AddQueuePage />
                 </Routes>
             </main>
         </Router>
