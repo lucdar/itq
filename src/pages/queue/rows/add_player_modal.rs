@@ -7,8 +7,8 @@ pub fn AddPlayerModal(order: usize, side: Side) -> impl IntoView {
     let queue_info = use_context::<QueueInfo>()
         .expect("there to be a `queue_info` provided.");
     let add_player = ServerAction::<AddPlayer>::new();
-    let pending = add_player.pending();
-    let value = add_player.value();
+    let _pending = add_player.pending();
+    let _value = add_player.value();
 
     view! {
         <div class="modal-container">
