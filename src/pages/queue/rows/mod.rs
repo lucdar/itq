@@ -1,8 +1,11 @@
 mod add_player_modal;
 
 use crate::queue::{EntryPlayers, QueueEntry, QueueInfo, Side};
-use leptos::{prelude::*, logging::{log, error}};
-use leptos::server_fn::serde::{Serialize, Deserialize};
+use leptos::server_fn::serde::{Deserialize, Serialize};
+use leptos::{
+    logging::{error, log},
+    prelude::*,
+};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -17,33 +20,43 @@ pub fn QueueRows() -> impl IntoView {
     let queue_info = use_context::<QueueInfo>()
         .expect("there to be a `queue_info` provided.");
 
-    let entry_store: Resource<Result<Vec<LocalQueueEntry>, ServerFnError>> = Resource::new(|| (), move |_| async move {
-        get_queue_entries(queue_info.id).await
-            .map(|entries| {
-                entries
-                    .into_iter()
-                    .map(|entry| {
-                        let (left, right) = match entry.players {
-                            EntryPlayers::LeftOnly(left) => (Some(left), None),
-                            EntryPlayers::RightOnly(right) => (None, Some(right)),
-                            EntryPlayers::Both(left, right) => (Some(left), Some(right)),
-                        };
-                        LocalQueueEntry {
-                            id: entry.id,
-                            left: RwSignal::new(left),
-                            right: RwSignal::new(right),
-                        }
+    let entry_store: Resource<Result<Vec<LocalQueueEntry>, ServerFnError>> =
+        Resource::new(
+            || (),
+            move |_| async move {
+                get_queue_entries(queue_info.id)
+                    .await
+                    .map(|entries| {
+                        entries
+                            .into_iter()
+                            .map(|entry| {
+                                let (left, right) = match entry.players {
+                                    EntryPlayers::LeftOnly(left) => {
+                                        (Some(left), None)
+                                    }
+                                    EntryPlayers::RightOnly(right) => {
+                                        (None, Some(right))
+                                    }
+                                    EntryPlayers::Both(left, right) => {
+                                        (Some(left), Some(right))
+                                    }
+                                };
+                                LocalQueueEntry {
+                                    id: entry.id,
+                                    left: RwSignal::new(left),
+                                    right: RwSignal::new(right),
+                                }
+                            })
+                            .collect()
                     })
-                    .collect()
-            })  
-            .inspect_err(|e| {
-                error!("Error getting queue entries: {}", e);
-            })
-    });
-    
+                    .inspect_err(|e| {
+                        error!("Error getting queue entries: {}", e);
+                    })
+            },
+        );
+
     view! {
-        <Suspense 
-            fallback=move || {
+        <Suspense fallback=move || {
             view! { <p>"Loading rows..."</p> }
         }>
             {move || match entry_store.get() {
@@ -52,18 +65,17 @@ pub fn QueueRows() -> impl IntoView {
                         <For
                             each=move || { entries.clone().into_iter().enumerate() }
                             key=|(_, entry)| entry.id
-                            children=move |(order, entry)| view! { <Row entry order/> }
+                            children=move |(order, entry)| view! { <Row entry order /> }
                         />
-                    }.into_any()
-                },
+                    }
+                        .into_any()
+                }
                 Some(Err(e)) => {
-                    view! {
-                        <p>"Error loading rows: "{e.to_string()}</p>
-                    }.into_any()
-                },
-                None => ().into_any()
-            }}
-            <EmptyRow/>
+                    view! { <p>"Error loading rows: "{e.to_string()}</p> }
+                        .into_any()
+                }
+                None => ().into_any(),
+            }} <EmptyRow />
         </Suspense>
     }
 }
@@ -73,8 +85,16 @@ pub fn Row(entry: LocalQueueEntry, order: usize) -> impl IntoView {
     view! {
         <div class="rowContainer">
             <div class="orderLabel">{order + 1}</div>
-            <PlayerToken player_data=entry.left.into() side=Side::Left id=Some(entry.id)/>
-            <PlayerToken player_data=entry.right.into() side=Side::Right id=Some(entry.id)/>
+            <PlayerToken
+                player_data=entry.left.into()
+                side=Side::Left
+                id=Some(entry.id)
+            />
+            <PlayerToken
+                player_data=entry.right.into()
+                side=Side::Right
+                id=Some(entry.id)
+            />
         </div>
     }
 }
@@ -84,8 +104,16 @@ pub fn EmptyRow() -> impl IntoView {
     view! {
         <div class="rowContainer">
             <div class="orderLabel">"-"</div>
-            <PlayerToken player_data=Signal::derive(move || None) side=Side::Left id=None/>
-            <PlayerToken player_data=Signal::derive(move || None) side=Side::Right id=None/>
+            <PlayerToken
+                player_data=Signal::derive(move || None)
+                side=Side::Left
+                id=None
+            />
+            <PlayerToken
+                player_data=Signal::derive(move || None)
+                side=Side::Right
+                id=None
+            />
         </div>
     }
 }
@@ -95,7 +123,7 @@ pub fn EmptyRow() -> impl IntoView {
 // etc. Might not really make sense unless it's used in many places.
 #[component]
 pub fn PlayerToken(
-    player_data: Signal<Option<String>>, 
+    player_data: Signal<Option<String>>,
     side: Side,
     id: Option<Uuid>,
 ) -> impl IntoView {
@@ -105,14 +133,16 @@ pub fn PlayerToken(
     view! {
         <Show
             when=move || player_data.get().is_none()
-            fallback=move || view! {
-                <div class="player-token">
-                    <p>{player_data.get().unwrap()}</p>
-                </div>
+            fallback=move || {
+                view! {
+                    <div class="player-token">
+                        <p>{player_data.get().unwrap()}</p>
+                    </div>
+                }
             }
         >
             <div class="player-token empty">
-                <button /* on:click=move |_| set_modal_state.set((id, side)) */ >
+                <button>
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
