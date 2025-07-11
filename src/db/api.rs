@@ -3,7 +3,6 @@ use crate::db::QueueRow;
 use crate::queue::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
-use leptos::attr::target;
 use leptos::logging::error;
 use thiserror::Error;
 use uuid::Uuid;
