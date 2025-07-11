@@ -1,11 +1,9 @@
 mod add_player_modal;
 
-use crate::queue::{EntryPlayers, QueueEntry, QueueInfo, Side};
+use crate::queue::{QueueEntry, QueueInfo, Side};
+use add_player_modal::AddPlayerModal;
 use leptos::server_fn::serde::{Deserialize, Serialize};
-use leptos::{
-    logging::{error, log},
-    prelude::*,
-};
+use leptos::{logging::error, prelude::*};
 use uuid::Uuid;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -15,57 +13,68 @@ pub struct LocalQueueEntry {
     right: RwSignal<Option<String>>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AddModalState {
+    Open {
+        row_id: Option<Uuid>,
+        side: Side,
+        order: usize,
+    },
+    Closed,
+}
+pub type EntryStore = Vec<LocalQueueEntry>;
+pub type EntryStoreResource = Resource<Result<EntryStore, ServerFnError>>;
+
 #[component]
-pub fn QueueRows() -> impl IntoView {
+pub fn Rows() -> impl IntoView {
     let queue_info = use_context::<QueueInfo>()
         .expect("there to be a `queue_info` provided.");
+    let (modal_state, set_modal_state) = signal(AddModalState::Closed);
+    provide_context(modal_state);
+    provide_context(set_modal_state);
 
-    let entry_store: Resource<Result<Vec<LocalQueueEntry>, ServerFnError>> =
-        Resource::new(
-            || (),
-            move |_| async move {
-                get_queue_entries(queue_info.id)
-                    .await
-                    .map(|entries| {
-                        entries
-                            .into_iter()
-                            .map(|entry| {
-                                let (left, right) = match entry.players {
-                                    EntryPlayers::LeftOnly(left) => {
-                                        (Some(left), None)
-                                    }
-                                    EntryPlayers::RightOnly(right) => {
-                                        (None, Some(right))
-                                    }
-                                    EntryPlayers::Both(left, right) => {
-                                        (Some(left), Some(right))
-                                    }
-                                };
-                                LocalQueueEntry {
-                                    id: entry.id,
-                                    left: RwSignal::new(left),
-                                    right: RwSignal::new(right),
-                                }
-                            })
-                            .collect()
-                    })
-                    .inspect_err(|e| {
-                        error!("Error getting queue entries: {}", e);
-                    })
-            },
-        );
+    let entry_store_rsc: EntryStoreResource = Resource::new(
+        || (),
+        move |_| async move {
+            get_queue_entries(queue_info.id)
+                .await
+                .map(|server_entries| {
+                    server_entries
+                        .into_iter()
+                        .map(|entry| {
+                            let (left, right) = entry.players.players_tuple();
+                            LocalQueueEntry {
+                                id: entry.id,
+                                left: RwSignal::new(left),
+                                right: RwSignal::new(right),
+                            }
+                        })
+                        .collect()
+                })
+                .inspect_err(|e| {
+                    error!("Error getting queue entries: {}", e);
+                })
+        },
+    );
 
     view! {
         <Suspense fallback=move || {
             view! { <p>"Loading rows..."</p> }
         }>
-            {move || match entry_store.get() {
-                Some(Ok(entries)) => {
+            {move || match entry_store_rsc.get() {
+                Some(Ok(entry_store)) => {
+                    provide_context(entry_store.clone());
+                    let max_order = entry_store.len();
                     view! {
                         <For
-                            each=move || { entries.clone().into_iter().enumerate() }
+                            each=move || { entry_store.clone().into_iter().enumerate() }
                             key=|(_, entry)| entry.id
                             children=move |(order, entry)| view! { <Row entry order /> }
+                        />
+                        <EmptyRow order=max_order + 1 />
+                        <AddPlayerModal
+                            state=modal_state
+                            set_state=set_modal_state
                         />
                     }
                         .into_any()
@@ -75,7 +84,7 @@ pub fn QueueRows() -> impl IntoView {
                         .into_any()
                 }
                 None => ().into_any(),
-            }} <EmptyRow />
+            }}
         </Suspense>
     }
 }
@@ -89,18 +98,20 @@ pub fn Row(entry: LocalQueueEntry, order: usize) -> impl IntoView {
                 player_data=entry.left.into()
                 side=Side::Left
                 id=Some(entry.id)
+                order
             />
             <PlayerToken
                 player_data=entry.right.into()
                 side=Side::Right
                 id=Some(entry.id)
+                order
             />
         </div>
     }
 }
 
 #[component]
-pub fn EmptyRow() -> impl IntoView {
+pub fn EmptyRow(order: usize) -> impl IntoView {
     view! {
         <div class="rowContainer">
             <div class="orderLabel">"-"</div>
@@ -108,11 +119,13 @@ pub fn EmptyRow() -> impl IntoView {
                 player_data=Signal::derive(move || None)
                 side=Side::Left
                 id=None
+                order
             />
             <PlayerToken
                 player_data=Signal::derive(move || None)
                 side=Side::Right
                 id=None
+                order
             />
         </div>
     }
@@ -124,11 +137,12 @@ pub fn EmptyRow() -> impl IntoView {
 #[component]
 pub fn PlayerToken(
     player_data: Signal<Option<String>>,
+    order: usize,
     side: Side,
     id: Option<Uuid>,
 ) -> impl IntoView {
     // TODO: implement this
-    // let set_modal_state = expect_context::<WriteSignal<Option<(Option<Uuid>, Side)>>>();
+    let set_modal_state = expect_context::<WriteSignal<AddModalState>>();
 
     view! {
         <Show
@@ -142,7 +156,14 @@ pub fn PlayerToken(
             }
         >
             <div class="player-token empty">
-                <button>
+                <button on:click=move |_| {
+                    set_modal_state
+                        .set(AddModalState::Open {
+                            row_id: id,
+                            side,
+                            order,
+                        });
+                }>
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
@@ -169,5 +190,7 @@ pub async fn get_queue_entries(
 ) -> Result<Vec<QueueEntry>, ServerFnError> {
     use crate::db::{api::get_queue_entries, DbPool};
     let pool = use_context::<DbPool>().expect("there to be a `pool` provided.");
-    Ok(get_queue_entries(queue_id, pool).await?)
+    Ok(get_queue_entries(queue_id, pool)
+        .await
+        .inspect_err(|e| error!("Error getting queue entries: {}", e))?)
 }

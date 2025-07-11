@@ -2,7 +2,7 @@ use leptos::server_fn::serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QueueInfo {
     pub id: Uuid,
     pub url_name: String,
@@ -25,7 +25,17 @@ pub enum EntryPlayers {
     Both(String, String),
 }
 
-#[derive(Debug, Copy, Clone, Serialize, Deserialize)]
+impl EntryPlayers {
+    pub fn players_tuple(self) -> (Option<String>, Option<String>) {
+        match self {
+            EntryPlayers::LeftOnly(left) => (Some(left), None),
+            EntryPlayers::RightOnly(right) => (None, Some(right)),
+            EntryPlayers::Both(left, right) => (Some(left), Some(right)),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Side {
     Left,
     Right,

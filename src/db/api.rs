@@ -3,6 +3,7 @@ use crate::db::QueueRow;
 use crate::queue::*;
 use diesel::prelude::*;
 use diesel_async::RunQueryDsl;
+use leptos::attr::target;
 use leptos::logging::error;
 use thiserror::Error;
 use uuid::Uuid;
@@ -11,7 +12,7 @@ use uuid::Uuid;
 pub enum ApiError {
     #[error("database connection pool error")]
     PoolError(#[from] diesel_async::pooled_connection::deadpool::PoolError),
-    #[error("diesel error")]
+    #[error("diesel error: {0}")]
     DieselError(#[from] diesel::result::Error),
     #[error("player slot already occupied. row: {row_id}, order: {order}, side: {side}")]
     Occupied {
@@ -117,75 +118,59 @@ pub async fn delete_queue(
 
 pub async fn add_player(
     queue_id: Uuid,
+    row_id: Option<Uuid>,
     player: String,
-    order: i32,
     side: Side,
     pool: db::DbPool,
 ) -> Result<(), ApiError> {
     use db::schema::queue_rows::dsl;
     let conn = &mut pool.get().await?;
 
-    // Query database for row that matches provided order
-    let db_row: Option<QueueRow> = dsl::queue_rows
-        .filter(dsl::queue_id.eq(queue_id))
-        .filter(dsl::queue_order.eq(order))
-        .first::<QueueRow>(conn)
-        .await
-        .optional()?;
-
-    if let Some(mut row) = db_row {
-        // A row with the given order already exists, so we're adding a player to it.
-        let player_slot = match side {
-            Side::Left => &mut row.left_player_name,
-            Side::Right => &mut row.right_player_name,
+    if let Some(row_id) = row_id {
+        // If a row ID is provided, query it and attempt to add the player
+        let mut db_row: QueueRow = dsl::queue_rows
+            .filter(dsl::id.eq(row_id))
+            .first::<QueueRow>(conn)
+            .await?;
+        let target_slot = match side {
+            Side::Left => &mut db_row.left_player_name,
+            Side::Right => &mut db_row.right_player_name,
         };
-        if player_slot.is_some() {
+        if target_slot.is_some() {
             return Err(ApiError::Occupied {
-                row_id: row.id,
-                order: row.queue_order,
+                row_id: db_row.id,
+                order: db_row.queue_order,
                 side,
             });
         }
-        *player_slot = Some(player);
-        diesel::update(dsl::queue_rows.find(row.id))
-            .set(&row)
+        *target_slot = Some(player);
+        // It might be possible to avoid this 2nd dbrt with some database
+        // shenanigans, but I don't think it's worth figuring out right now.
+        diesel::update(dsl::queue_rows.find(row_id))
+            .set(&db_row)
             .execute(conn)
             .await?;
     } else {
-        // The row does not exist, so we are creating a new entry at the end of the queue.
-        use diesel::dsl::max;
-
-        // First, verify that the new row is sequential
-        let max_order: Option<i32> = dsl::queue_rows
-            .filter(dsl::queue_id.eq(queue_id))
-            .select(max(dsl::queue_order))
-            .first(conn)
-            .await?;
-
-        // If no rows exist, the first order should be 0.
-        let expected_order = max_order.map_or(0, |val| val + 1);
-        if order != expected_order {
-            return Err(ApiError::InvalidOrder {
-                expected: expected_order,
-                got: order,
-            });
-        }
-
-        let (left_player_name, right_player_name) = match side {
+        let (left, right) = match side {
             Side::Left => (Some(player), None),
             Side::Right => (None, Some(player)),
         };
+        let max_order = dsl::queue_rows
+            .filter(dsl::queue_id.eq(queue_id))
+            .select(dsl::queue_order)
+            .order(dsl::queue_order.desc())
+            .first::<i32>(conn)
+            .await?;
         let new_row = db::NewQueueRow {
             queue_id,
-            left_player_name,
-            right_player_name,
-            queue_order: order,
+            left_player_name: left,
+            right_player_name: right,
+            queue_order: max_order + 1,
         };
         diesel::insert_into(dsl::queue_rows)
             .values(&new_row)
             .execute(conn)
             .await?;
     }
-
     Ok(())
 }

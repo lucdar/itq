@@ -26,16 +26,14 @@ pub fn AddQueuePage() -> impl IntoView {
                     .map(|result| {
                         match result {
                             Ok(queue_info) => {
-                                {
-                                    view! {
-                                        <p>
-                                            "Queue added: "
-                                            <a href=format!(
-                                                "/queue/{}",
-                                                queue_info.url_name,
-                                            )>{queue_info.display_name}</a>
-                                        </p>
-                                    }
+                                view! {
+                                    <p>
+                                        "Queue added: "
+                                        <a href=format!(
+                                            "/queue/{}",
+                                            queue_info.url_name,
+                                        )>{queue_info.display_name}</a>
+                                    </p>
                                 }
                                     .into_any()
                             }

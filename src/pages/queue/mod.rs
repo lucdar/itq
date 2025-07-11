@@ -2,23 +2,26 @@ mod delete_button;
 mod header;
 mod rows;
 
-use crate::queue::QueueInfo;
+use crate::queue::{QueueInfo, Side};
 use delete_button::DeleteButton;
 use header::QueueHeader;
 use leptos::context::provide_context;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
-use rows::QueueRows;
+use rows::Rows;
+use uuid::Uuid;
 
 #[component]
 pub fn QueuePage() -> impl IntoView {
     let params = use_params_map();
-    let url_queue_name = move || params.read().get("url_name");
+    let url_queue_name = move || {
+        params
+            .read()
+            .get("url_name")
+            .expect("there to be a `url_name` guaranteed by the router")
+    };
     let queue_info = Resource::new(url_queue_name, |name| async {
-        match name {
-            Some(name) => get_queue(name).await.ok(),
-            None => None,
-        }
+        get_queue(name).await.ok()
     });
 
     view! {
@@ -35,9 +38,10 @@ pub fn QueuePage() -> impl IntoView {
                             view! { <h1>"Error: No Queue Found"</h1> }.into_any(),
                             move |queue_info| {
                                 provide_context(queue_info);
+                                // Provide context for deeply nested components
                                 view! {
                                     <QueueHeader />
-                                    <QueueRows />
+                                    <Rows />
                                     <DeleteButton />
                                 }
                                     .into_any()
