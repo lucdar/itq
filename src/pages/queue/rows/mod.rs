@@ -6,9 +6,17 @@ use leptos::server_fn::serde::{Deserialize, Serialize};
 use leptos::{logging::error, prelude::*};
 use uuid::Uuid;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
+pub enum LocalUuidState {
+    /// Resolved state for existing entries
+    Resolved(Uuid),
+    /// Pending state with a random UUID for new entries
+    Pending(Uuid),
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct LocalQueueEntry {
-    id: Uuid,
+    id: RwSignal<LocalUuidState>,
     left: RwSignal<Option<String>>,
     right: RwSignal<Option<String>>,
 }
@@ -23,7 +31,6 @@ pub enum AddModalState {
     Closed,
 }
 pub type EntryStore = Vec<LocalQueueEntry>;
-pub type EntryStoreResource = Resource<Result<EntryStore, ServerFnError>>;
 
 #[component]
 pub fn Rows() -> impl IntoView {
@@ -33,57 +40,70 @@ pub fn Rows() -> impl IntoView {
     provide_context(modal_state);
     provide_context(set_modal_state);
 
-    let entry_store_rsc: EntryStoreResource = Resource::new(
-        || (),
-        move |_| async move {
-            get_queue_entries(queue_info.id)
-                .await
-                .map(|server_entries| {
-                    server_entries
-                        .into_iter()
-                        .map(|entry| {
-                            let (left, right) = entry.players.players_tuple();
-                            LocalQueueEntry {
-                                id: entry.id,
-                                left: RwSignal::new(left),
-                                right: RwSignal::new(right),
-                            }
-                        })
-                        .collect()
-                })
-                .inspect_err(|e| {
-                    error!("Error getting queue entries: {}", e);
-                })
-        },
-    );
+    // Load and unpack entries from server on page load.
+    let entry_store_rsc: Resource<Result<Vec<LocalQueueEntry>, ServerFnError>> =
+        Resource::new(
+            || (),
+            move |_| async move {
+                get_queue_entries(queue_info.id)
+                    .await
+                    .map(|server_entries| {
+                        server_entries
+                            .into_iter()
+                            .map(|entry| {
+                                let (left, right) =
+                                    entry.players.players_tuple();
+                                LocalQueueEntry {
+                                    id: RwSignal::new(
+                                        LocalUuidState::Resolved(entry.id),
+                                    ),
+                                    left: RwSignal::new(left),
+                                    right: RwSignal::new(right),
+                                }
+                            })
+                            .collect()
+                    })
+                    .inspect_err(|e| {
+                        error!("Error getting queue entries: {}", e);
+                    })
+            },
+        );
+
+    let entry_store_signal = RwSignal::new(Vec::new());
+    provide_context(entry_store_signal);
+    // Update entry store signal when entries load
+    Effect::new(move |_| {
+        if let Some(Ok(entries)) = entry_store_rsc.get() {
+            entry_store_signal.set(entries);
+        }
+    });
 
     view! {
         <Suspense fallback=move || {
             view! { <p>"Loading rows..."</p> }
         }>
-            {move || match entry_store_rsc.get() {
-                Some(Ok(entry_store)) => {
-                    provide_context(entry_store.clone());
-                    let max_order = entry_store.len();
-                    view! {
-                        <For
-                            each=move || { entry_store.clone().into_iter().enumerate() }
-                            key=|(_, entry)| entry.id
-                            children=move |(order, entry)| view! { <Row entry order /> }
-                        />
-                        <EmptyRow order=max_order + 1 />
-                        <AddPlayerModal
-                            state=modal_state
-                            set_state=set_modal_state
-                        />
+            {move || {
+                if let Some(Err(e)) = entry_store_rsc.get() {
+                    return view! {
+                        <p>"Error loading rows: "{e.to_string()}</p>
                     }
-                        .into_any()
+                        .into_any();
                 }
-                Some(Err(e)) => {
-                    view! { <p>"Error loading rows: "{e.to_string()}</p> }
-                        .into_any()
+                view! {
+                    <For
+                        each=move || {
+                            entry_store_signal.get().into_iter().enumerate()
+                        }
+                        key=|(_, entry)| entry.id.get()
+                        children=move |(order, entry)| view! { <Row entry order /> }
+                    />
+                    <EmptyRow order=entry_store_signal.with(|es| es.len()) />
+                    <AddPlayerModal
+                        modal_state=modal_state
+                        set_modal_state=set_modal_state
+                    />
                 }
-                None => ().into_any(),
+                    .into_any()
             }}
         </Suspense>
     }
@@ -91,19 +111,25 @@ pub fn Rows() -> impl IntoView {
 
 #[component]
 pub fn Row(entry: LocalQueueEntry, order: usize) -> impl IntoView {
+    // "Deactivate" the row if there is no UUID on the frontend
+    let is_inactive =
+        move || matches!(entry.id.get(), LocalUuidState::Pending(_));
+    // Signal that gets the entry id and wraps in Some
+    let id = Signal::derive(move || Some(entry.id.get()));
+
     view! {
-        <div class="rowContainer">
+        <div class="rowContainer" class:inactive=is_inactive>
             <div class="orderLabel">{order + 1}</div>
             <PlayerToken
                 player_data=entry.left.into()
                 side=Side::Left
-                id=Some(entry.id)
+                id=id
                 order
             />
             <PlayerToken
                 player_data=entry.right.into()
                 side=Side::Right
-                id=Some(entry.id)
+                id=id
                 order
             />
         </div>
@@ -118,13 +144,13 @@ pub fn EmptyRow(order: usize) -> impl IntoView {
             <PlayerToken
                 player_data=Signal::derive(move || None)
                 side=Side::Left
-                id=None
+                id=Signal::derive(move || None)
                 order
             />
             <PlayerToken
                 player_data=Signal::derive(move || None)
                 side=Side::Right
-                id=None
+                id=Signal::derive(move || None)
                 order
             />
         </div>
@@ -139,14 +165,13 @@ pub fn PlayerToken(
     player_data: Signal<Option<String>>,
     order: usize,
     side: Side,
-    id: Option<Uuid>,
+    id: Signal<Option<LocalUuidState>>,
 ) -> impl IntoView {
-    // TODO: implement this
     let set_modal_state = expect_context::<WriteSignal<AddModalState>>();
 
     view! {
         <Show
-            when=move || player_data.get().is_none()
+            when=move || { player_data.get().is_none() }
             fallback=move || {
                 view! {
                     <div class="player-token">
@@ -157,9 +182,15 @@ pub fn PlayerToken(
         >
             <div class="player-token empty">
                 <button on:click=move |_| {
+                    leptos::logging::log!("Clicked on empty player token");
+                    let row_id = match id.get() {
+                        None | Some(LocalUuidState::Pending(_)) => None,
+                        Some(LocalUuidState::Resolved(uuid)) => Some(uuid),
+                    };
+                    leptos::logging::log!("Row: {:?}", row_id);
                     set_modal_state
                         .set(AddModalState::Open {
-                            row_id: id,
+                            row_id,
                             side,
                             order,
                         });

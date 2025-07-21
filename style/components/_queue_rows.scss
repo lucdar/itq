@@ -1,19 +1,23 @@
 .rowContainer {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  margin-bottom: 0.5rem;
-  padding: 0.5rem;
-  border-radius: 0.25rem;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 0.25rem;
 
-  &:nth-child(even) {
-    background-color: #f7fafc;
-  }
+    &:nth-child(even) {
+        background-color: #f7fafc;
+    }
+}
+
+.rowContainer.inactive {
+    border: 1px dashed #e53e3e;
 }
 
 .orderLabel {
-  width: 2rem;
-  text-align: center;
-  font-weight: bold;
-  color: #718096;
+    width: 2rem;
+    text-align: center;
+    font-weight: bold;
+    color: #718096;
 }

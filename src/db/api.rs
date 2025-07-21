@@ -115,61 +115,73 @@ pub async fn delete_queue(
     Ok(())
 }
 
-pub async fn add_player(
-    queue_id: Uuid,
-    row_id: Option<Uuid>,
+/// Adds a player to an existing queue row.
+pub async fn add_player_to_row(
+    row_id: Uuid,
     player: String,
     side: Side,
     pool: db::DbPool,
-) -> Result<(), ApiError> {
+) -> Result<Uuid, ApiError> {
     use db::schema::queue_rows::dsl;
     let conn = &mut pool.get().await?;
 
-    if let Some(row_id) = row_id {
-        // If a row ID is provided, query it and attempt to add the player
-        let mut db_row: QueueRow = dsl::queue_rows
-            .filter(dsl::id.eq(row_id))
-            .first::<QueueRow>(conn)
-            .await?;
-        let target_slot = match side {
-            Side::Left => &mut db_row.left_player_name,
-            Side::Right => &mut db_row.right_player_name,
-        };
-        if target_slot.is_some() {
-            return Err(ApiError::Occupied {
-                row_id: db_row.id,
-                order: db_row.queue_order,
-                side,
-            });
-        }
-        *target_slot = Some(player);
-        // It might be possible to avoid this 2nd dbrt with some database
-        // shenanigans, but I don't think it's worth figuring out right now.
-        diesel::update(dsl::queue_rows.find(row_id))
-            .set(&db_row)
-            .execute(conn)
-            .await?;
-    } else {
-        let (left, right) = match side {
-            Side::Left => (Some(player), None),
-            Side::Right => (None, Some(player)),
-        };
-        let max_order = dsl::queue_rows
-            .filter(dsl::queue_id.eq(queue_id))
-            .select(dsl::queue_order)
-            .order(dsl::queue_order.desc())
-            .first::<i32>(conn)
-            .await?;
-        let new_row = db::NewQueueRow {
-            queue_id,
-            left_player_name: left,
-            right_player_name: right,
-            queue_order: max_order + 1,
-        };
-        diesel::insert_into(dsl::queue_rows)
-            .values(&new_row)
-            .execute(conn)
-            .await?;
+    // If a row ID is provided, query it and attempt to add the player
+    let mut db_row: QueueRow = dsl::queue_rows
+        .filter(dsl::id.eq(row_id))
+        .first::<QueueRow>(conn)
+        .await?;
+    let target_slot = match side {
+        Side::Left => &mut db_row.left_player_name,
+        Side::Right => &mut db_row.right_player_name,
+    };
+    if target_slot.is_some() {
+        return Err(ApiError::Occupied {
+            row_id: db_row.id,
+            order: db_row.queue_order,
+            side,
+        });
     }
-    Ok(())
+    *target_slot = Some(player);
+    // It might be possible to avoid this 2nd dbrt with some database
+    // shenanigans, but I don't think it's worth figuring out right now.
+    diesel::update(dsl::queue_rows.find(row_id))
+        .set(&db_row)
+        .execute(conn)
+        .await?;
+    return Ok(db_row.id);
+}
+
+pub async fn add_row(
+    queue_id: Uuid,
+    player: String,
+    side: Side,
+    pool: db::DbPool,
+) -> Result<Uuid, ApiError> {
+    use db::schema::queue_rows::dsl;
+    let conn = &mut pool.get().await?;
+
+    // Create new row
+    let (left, right) = match side {
+        Side::Left => (Some(player), None),
+        Side::Right => (None, Some(player)),
+    };
+    let max_order = dsl::queue_rows
+        .filter(dsl::queue_id.eq(queue_id))
+        .select(dsl::queue_order)
+        .order(dsl::queue_order.desc())
+        .first::<i32>(conn)
+        .await
+        .optional()?;
+    let new_row = db::NewQueueRow {
+        queue_id,
+        left_player_name: left,
+        right_player_name: right,
+        queue_order: max_order.map_or(0, |o| o + 1),
+    };
+    let new_row_id = diesel::insert_into(dsl::queue_rows)
+        .values(&new_row)
+        .returning(dsl::id)
+        .get_result(conn)
+        .await?;
+    Ok(new_row_id)
 }

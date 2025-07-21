@@ -2,14 +2,13 @@ mod delete_button;
 mod header;
 mod rows;
 
-use crate::queue::{QueueInfo, Side};
+use crate::queue::QueueInfo;
 use delete_button::DeleteButton;
 use header::QueueHeader;
 use leptos::context::provide_context;
 use leptos::prelude::*;
 use leptos_router::hooks::use_params_map;
 use rows::Rows;
-use uuid::Uuid;
 
 #[component]
 pub fn QueuePage() -> impl IntoView {
