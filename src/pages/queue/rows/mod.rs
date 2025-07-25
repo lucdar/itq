@@ -72,11 +72,21 @@ pub fn Rows() -> impl IntoView {
     let entry_store_signal = RwSignal::new(Vec::new());
     provide_context(entry_store_signal);
     // Update entry store signal when entries load
-    Effect::new(move |_| {
-        if let Some(Ok(entries)) = entry_store_rsc.get() {
-            entry_store_signal.set(entries);
-        }
+    Effect::new(move |_| match entry_store_rsc.get() {
+        Some(Ok(entries)) => entry_store_signal.set(entries),
+        Some(Err(e)) => error!("Error loading rows: {}", e),
+        _ => (),
     });
+
+    // TODO: There is a weird "double paint" that happens when loading rows.
+    // It's especially noticable when we compile in non-release mode with a
+    // larger .wasm bundle. It's like the Suspense displays the result before
+    // the .wasm finishes loading and it displays the <EmptyRow /> and the
+    // <AddPlayerModal /> before the <For /> can be rendered all the way.
+    //
+    // I think the same thing still happens in release mode but it's much
+    // faster? It might just genuinely be a performance thing? Maybe there's
+    // some SSR shenanigans going on, too. idk.
 
     view! {
         <Suspense fallback=move || {
@@ -112,10 +122,13 @@ pub fn Rows() -> impl IntoView {
 #[component]
 pub fn Row(entry: LocalQueueEntry, order: usize) -> impl IntoView {
     // "Deactivate" the row if there is no UUID on the frontend
-    let is_inactive =
-        move || matches!(entry.id.get(), LocalUuidState::Pending(_));
+    let is_inactive = Signal::derive(move || {
+        matches!(entry.id.get(), LocalUuidState::Pending(_))
+    });
     // Signal that gets the entry id and wraps in Some
     let id = Signal::derive(move || Some(entry.id.get()));
+
+    // TODO: Drag & Drop Reordering (😬)
 
     view! {
         <div class="rowContainer" class:inactive=is_inactive>
@@ -125,12 +138,14 @@ pub fn Row(entry: LocalQueueEntry, order: usize) -> impl IntoView {
                 side=Side::Left
                 id=id
                 order
+                is_inactive=is_inactive
             />
             <PlayerToken
                 player_data=entry.right.into()
                 side=Side::Right
                 id=id
                 order
+                is_inactive=is_inactive
             />
         </div>
     }
@@ -146,12 +161,14 @@ pub fn EmptyRow(order: usize) -> impl IntoView {
                 side=Side::Left
                 id=Signal::derive(move || None)
                 order
+                is_inactive=Signal::derive(move || false)
             />
             <PlayerToken
                 player_data=Signal::derive(move || None)
                 side=Side::Right
                 id=Signal::derive(move || None)
                 order
+                is_inactive=Signal::derive(move || false)
             />
         </div>
     }
@@ -166,7 +183,15 @@ pub fn PlayerToken(
     order: usize,
     side: Side,
     id: Signal<Option<LocalUuidState>>,
+    is_inactive: Signal<bool>,
 ) -> impl IntoView {
+    // TODO: make use of is_inactive to change the behaivor (i.e. don't let this
+    // be interacted with at all)
+
+    // TODO: Add remaining missing functionality
+    // * Delete Player
+    // * Drag and Drop Swap??
+
     let set_modal_state = expect_context::<WriteSignal<AddModalState>>();
 
     view! {
@@ -182,12 +207,10 @@ pub fn PlayerToken(
         >
             <div class="player-token empty">
                 <button on:click=move |_| {
-                    leptos::logging::log!("Clicked on empty player token");
                     let row_id = match id.get() {
                         None | Some(LocalUuidState::Pending(_)) => None,
                         Some(LocalUuidState::Resolved(uuid)) => Some(uuid),
                     };
-                    leptos::logging::log!("Row: {:?}", row_id);
                     set_modal_state
                         .set(AddModalState::Open {
                             row_id,

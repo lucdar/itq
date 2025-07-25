@@ -18,29 +18,24 @@ pub fn AddPlayerModal(
 
     let is_visible = move || modal_state.get() != AddModalState::Closed;
 
-    log!("ADD_PLAYER_MODAL: Rendering the modal!");
-
     let add_player = ServerAction::<AddPlayer>::new();
     let add_player_value = add_player.value();
 
     Effect::new(move |_| {
         let server_fn_result = add_player_value.get();
-        log!(
-            "EFFECT: AddPlayerModal value updated: {:?}",
-            server_fn_result
-        );
         // If a new row was created, update the optimistically rendered row.
         if let Some(Ok(Some((old_id, new_id)))) = server_fn_result {
-            log!("EFFECT: Updating new row id.\nOld: {old_id}\nNew: {new_id}");
-            entry_store_signal
+            match entry_store_signal
                 .read_untracked()
                 .iter()
                 .find(|e| {
                     e.id.read_untracked() == LocalUuidState::Pending(old_id)
-                })
-                .inspect(|e| {
-                    e.id.set(LocalUuidState::Resolved(new_id));
-                });
+                }) {
+                Some(e) => {
+                    e.id.set(LocalUuidState::Resolved(new_id))
+                }
+                None => log!("Couldn't find pending entry to update."),
+            }
         }
     });
 
@@ -52,26 +47,28 @@ pub fn AddPlayerModal(
                     if let AddModalState::Open { row_id, side, order } = modal_state
                         .get()
                     {
+                        // Generate pre-filled ActionForm inputs
+                        // I should be using LocalUuidState but I was lazy and
+                        // couldn't figure it out
                         let (resolved_id, pending_id) = match row_id {
                             Some(id) => (Some(id.to_string()), None),
                             None => (None, Some(uuid::Uuid::new_v4().to_string())),
                         };
-                        log!("MODAL_CREATE: resolved_id: {:?}", resolved_id);
-                        log!("MODAL_CREATE: pending_id: {:?}", pending_id);
 
                         view! {
                             <ActionForm
                                 action=add_player
                                 on:submit=move |ev| {
                                     set_modal_state.set(AddModalState::Closed);
+                                    // Optimistically update the changed row
                                     let input = AddPlayer::from_event(&ev)
                                         .expect("submission to be well-formed");
-                                    let row_id = local_uuid_helper(
+                                    let local_id = local_uuid_helper(
                                             input.resolved_id,
                                             input.pending_id,
                                         )
                                         .expect("row id hack to be well-formed");
-                                    match row_id {
+                                    match local_id {
                                         LocalUuidState::Resolved(_) => {
                                             let entry = entry_store_signal
                                                 .read()
@@ -85,8 +82,8 @@ pub fn AddPlayerModal(
                                             if slot.get().is_none() {
                                                 slot.set(Some(input.player))
                                             } else {
-                                                leptos::logging::error!(
-                                                    "ON_SUBMIT: Attempting to add player to occupied slot!"
+                                                error!(
+                                                    "ON_SUBMIT: Attempted to add player to occupied slot!"
                                                 )
                                             }
                                         }
@@ -100,16 +97,13 @@ pub fn AddPlayerModal(
                                                 }
                                             };
                                             let new_entry = LocalQueueEntry {
-                                                id: RwSignal::new(row_id),
+                                                id: RwSignal::new(local_id),
                                                 left,
                                                 right,
                                             };
                                             entry_store_signal
                                                 .update(|es| {
                                                     es.push(new_entry);
-                                                    leptos::logging::log!(
-                                                        "ON_SUBMIT: Added player to new row with pending ID"
-                                                    );
                                                 });
                                         }
                                     }
@@ -150,7 +144,7 @@ pub async fn add_player(
     use crate::db::{api::add_player_to_row, api::add_row, DbPool};
     let pool = use_context::<DbPool>().expect("there to be a pool provided.");
 
-    // TODO: get rid of this
+    // TODO: pass row_id as LocalUuidState instead of this bs lmao
     let row_id = local_uuid_helper(resolved_id, pending_id)?;
 
     match row_id {
@@ -162,8 +156,8 @@ pub async fn add_player(
                 .inspect_err(|e| error!("Error adding player: {}", e))?;
             Ok(None)
         }
-        // If we add a player to a new row, return the old and new IDs for the
-        // UI update.
+        // If we add a player to a new row, return the old and new IDs so we can
+        // update the optimistically rendered row
         LocalUuidState::Pending(temp_id) => {
             log!("SERVER_FN: adding player to new row");
             let new_id = add_row(queue_id, player, side, pool)
