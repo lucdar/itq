@@ -43,7 +43,7 @@ pub fn Rows() -> impl IntoView {
     // Load and unpack entries from server on page load.
     let entry_store_rsc: Resource<Result<Vec<LocalQueueEntry>, ServerFnError>> =
         Resource::new(
-            || (),
+            || (), // No dependencies, only run on page load
             move |_| async move {
                 get_queue_entries(queue_info.id)
                     .await
@@ -98,13 +98,13 @@ pub fn Rows() -> impl IntoView {
                         children=move |(order, entry)| view! { <Row entry order /> }
                     />
                     <EmptyRow order=entry_store_signal.with(|es| es.len()) />
-                    <AddPlayerModal
-                        modal_state=modal_state
-                        set_modal_state=set_modal_state
-                    />
                 }
                     .into_any()
             }}
+            <AddPlayerModal
+                modal_state
+                set_modal_state
+            />
         </Suspense>
     }
 }

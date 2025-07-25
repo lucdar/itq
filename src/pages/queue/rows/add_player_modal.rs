@@ -18,6 +18,8 @@ pub fn AddPlayerModal(
 
     let is_visible = move || modal_state.get() != AddModalState::Closed;
 
+    log!("ADD_PLAYER_MODAL: Rendering the modal!");
+
     let add_player = ServerAction::<AddPlayer>::new();
     let add_player_value = add_player.value();
 
@@ -36,7 +38,7 @@ pub fn AddPlayerModal(
                 .find(|e| {
                     e.id.read_untracked() == LocalUuidState::Pending(old_id)
                 })
-                .map(|e| {
+                .inspect(|e| {
                     e.id.set(LocalUuidState::Resolved(new_id));
                 });
         }
@@ -160,7 +162,8 @@ pub async fn add_player(
                 .inspect_err(|e| error!("Error adding player: {}", e))?;
             Ok(None)
         }
-        // If we add a player to a new row, return the old and new IDs for the UI update.
+        // If we add a player to a new row, return the old and new IDs for the
+        // UI update.
         LocalUuidState::Pending(temp_id) => {
             log!("SERVER_FN: adding player to new row");
             let new_id = add_row(queue_id, player, side, pool)
