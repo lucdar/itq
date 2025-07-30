@@ -144,6 +144,11 @@ pub async fn add_player(
     use crate::db::{api::add_player_to_row, api::add_row, DbPool};
     let pool = use_context::<DbPool>().expect("there to be a pool provided.");
 
+    // To monitor unresolved state
+    // use tokio::time::sleep;
+    // use tokio::time::Duration;
+    // sleep(Duration::from_millis(2000)).await;
+
     // TODO: pass row_id as LocalUuidState instead of this bs lmao
     let row_id = local_uuid_helper(resolved_id, pending_id)?;
 

@@ -38,4 +38,19 @@
       }
     }
   }
+
+  &.inactive {
+    background-color: #f7fafc;
+    border-color: #e2e8f0;
+    color: #a0aec0;
+
+    &.empty button {
+      color: #cbd5e0;
+      cursor: not-allowed;
+
+      &:hover {
+        color: #cbd5e0;
+      }
+    }
+  }
 }

@@ -185,9 +185,6 @@ pub fn PlayerToken(
     id: Signal<Option<LocalUuidState>>,
     is_inactive: Signal<bool>,
 ) -> impl IntoView {
-    // TODO: make use of is_inactive to change the behaivor (i.e. don't let this
-    // be interacted with at all)
-
     // TODO: Add remaining missing functionality
     // * Delete Player
     // * Drag and Drop Swap??
@@ -199,14 +196,14 @@ pub fn PlayerToken(
             when=move || { player_data.get().is_none() }
             fallback=move || {
                 view! {
-                    <div class="player-token">
+                    <div class="player-token" class:inactive=is_inactive>
                         <p>{player_data.get().unwrap()}</p>
                     </div>
                 }
             }
         >
-            <div class="player-token empty">
-                <button on:click=move |_| {
+            <div class="player-token empty" class:inactive=is_inactive>
+                <button disabled=is_inactive on:click=move |_| {
                     let row_id = match id.get() {
                         None | Some(LocalUuidState::Pending(_)) => None,
                         Some(LocalUuidState::Resolved(uuid)) => Some(uuid),
